@@ -1,5 +1,6 @@
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -22,12 +23,19 @@ app.use('/', createProxyMiddleware({
     target: TARGET_API_URL,
     changeOrigin: true,
     secure: false,
+    // 👇 Render တွင် Body (JSON) Data များကို မှန်ကန်စွာ Forward ဖြစ်စေရန်
     onProxyReq: (proxyReq, req, res) => {
-        console.log(`[PROXY REQUEST]: ${req.method} ${req.url}`);
+        console.log(`[PROXYING]: ${req.method} ${req.url}`);
+        if (req.body && Object.keys(req.body).length > 0) {
+            const bodyData = JSON.stringify(req.body);
+            proxyReq.setHeader('Content-Type', 'application/json');
+            proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+            proxyReq.write(bodyData);
+        }
     },
     onError: (err, req, res) => {
         console.error('[PROXY ERROR]:', err);
-        res.status(500).send('Proxy Error');
+        res.status(500).json({ error: 'Proxy Error', details: err.message });
     }
 }));
 
